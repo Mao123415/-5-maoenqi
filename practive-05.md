@@ -1,8 +1,24 @@
-# 实践课 5：Pi Agent 源码泛读与功能定位
+# 实践课 5 报告：Pi Agent 工具调用与会话恢复
+
+## 基本信息
+
+| 项目 | 内容 |
+| --- | --- |
+| 姓名拼音 | maoenqi |
+| GitHub 登录名 | Mao123415 |
+| 个人作业仓库 | [Mao123415/-5-maoenqi](https://github.com/Mao123415/-5-maoenqi) |
+| 小组代码仓库 | [MangDui/pi-hunnu-2026](https://github.com/MangDui/pi-hunnu-2026) |
+| 实验环境 | Windows + PowerShell，本地构建 Pi v1.5.2，保留实践 04 的 `[P4]` 日志 |
+| 实验模型 | `deepseek / deepseek-flash`，思考模式 off |
+| 实验日期 | 2026 年 11 月 26 日 |
+
+本次实验先验证一次输入如何触发工具执行和后续模型请求，再比较恢复会话与新建会话发送的聊天内容。结果以本人实际会话消息为依据，两张图使用本人更新的 draw.io 导出图片。
+
+报告导读：[A 阶段运行证据](task-a-evidence.json) · [B 阶段运行证据](task-b-evidence.json) · [图一源文件](img/figure-1-tool-call.drawio) · [图二源文件](img/figure-2-session-compare.drawio)
 
 ## A. 单轮交互与工具调用
 
-### 实验环境与操作
+### A-1 准备交接单与启动环境
 
 - 实验日期：2026 年 11 月 26 日，Asia/Shanghai。
 - 源码与运行目录：`D:\02-pi-agent-fork\pi-hunnu-2026`。
@@ -28,7 +44,7 @@ node .\packages\coding-agent\dist\cli.js --offline --no-extensions --no-mcp --no
 
 > 请用 read 工具读取当前目录的 handoff.txt，原样告诉我待办和启动命令。
 
-### 实际运行结果
+### A-2 实验过程与观察
 
 这一次用户输入触发了 **2 次模型调用、1 次 read 工具执行**。
 
@@ -38,6 +54,26 @@ node .\packages\coding-agent\dist\cli.js --offline --no-extensions --no-mcp --no
 | 2 | assistant，`stopReason=toolUse` | 返回 `I'll read the file.`，以及一个 read 工具调用。 |
 | 3 | toolResult，`toolName=read` | 返回文件的两行内容，`isError=false`，工具耗时记录为 4 ms。 |
 | 4 | assistant，`stopReason=stop` | 根据工具结果回答待办和完整启动命令，没有继续调用工具。 |
+
+终端显示 `read D:/02-pi-agent-fork/pi-hunnu-2026/handoff.txt`，随后出现文件内容和模型最终回答。已有 `[P4]` 日志反映的调用顺序是：
+
+```text
+[P4] Agent 即将请求模型
+    → 模型返回 read 工具调用
+    → read 返回文件内容
+[P4] 工具结果已加入上下文
+[P4] Agent 即将请求模型
+    → 模型返回最终回答
+```
+
+上面整理的是本轮顺序，不是终端截图或原样日志转储。调用次数也可以由消息记录独立核对：两个 assistant 消息分别以 `toolUse` 和 `stop` 结束，中间只有一条成功的 read 工具结果。
+
+| 模型请求 | 未命中缓存的输入 `input` | 缓存读取 `cacheRead` | 输入合计 | 输出 `output` | 结果 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 第 1 次 | 4155 | 0 | 4155 | 92 | 返回 read 调用 |
+| 第 2 次 | 192 | 4096 | 4288 | 41 | 根据文件内容回答 |
+
+第二次请求的输入合计增加了 133 token；其上下文新增了助手的工具调用和工具结果。本轮 toolResult 的 `durationMs=4`，这是工具执行耗时，不能当作整轮交互耗时。
 
 模型返回的原始工具参数如下。工具调用 ID 为 `call_00_Z2zYdWB32URwpooEPPm64773`，工具结果记录中的 `toolCallId` 与其一致。
 
@@ -110,7 +146,7 @@ C:\Users\Mao\.pi\agent\sessions\--D--02-pi-agent-fork-pi-hunnu-2026--\2026-11-26
 
 ## B. 恢复上次会话，继续写 README
 
-### 操作与控制条件
+### B-1 恢复原会话（-c）
 
 退出 A 阶段的 Pi 后，在同一目录用原来的启动命令加 `-c` 重新启动：
 
@@ -123,11 +159,13 @@ node .\packages\coding-agent\dist\cli.js --offline --no-extensions --no-mcp --no
 
 > 接着上次的待办，给 README 起草一条启动说明，写出交接单里的完整启动命令。只用这次会话已有的信息。不要调用工具。如果缺少命令，请直接说明。
 
+### B-2 新建会话（/new）
+
 待回答结束后输入 `/new`。终端显示 `New session started`，旧聊天记录消失。此版本新建会话后回到了配置默认的 platform 模型，因此先输入 `/model deepseek-flash` 切回与恢复分支相同的模型，再提交**逐字相同**的上述提问。没有把命令或随机标识加入提问，也没有禁用 read 工具；是否调用工具按实际记录统计。
 
 两次请求均在同一目录、使用 `deepseek / deepseek-flash`，思考模式 off。只在聊天里起草说明，没有执行交接单中的命令，也没有修改源码仓库的 README。
 
-### 两次回答与工具调用记录
+### B-3 两次回答与对照记录
 
 | 对照项 | 恢复 A 会话 | `/new` 新会话 |
 | --- | --- | --- |
@@ -135,8 +173,15 @@ node .\packages\coding-agent\dist\cli.js --offline --no-extensions --no-mcp --no
 | 本轮模型调用 | 1 次 | 1 次 |
 | 本轮工具调用 | 0 次 | 0 次 |
 | 完整命令 | 正确返回 `npm run demo -- --profile group-a9b32a` | 明确表示没有交接单内容，缺少完整命令 |
+| 界面是否回放 A 阶段聊天 | 是，显示原提问、read 记录和完整命令 | 否，显示 `New session started` |
+| 未命中缓存的输入 `input` | 150 token | 206 token |
+| 缓存读取 `cacheRead` | 4224 token | 3968 token |
+| 输入合计 `input + cacheRead` | 4374 token | 4174 token |
+| 输出 `output` | 150 token | 130 token |
 | `stopReason` | `stop` | `stop` |
 | 会话 ID | `01a216a6-9626-75fd-8445-b93065317661` | `01a216c9-2dc1-7462-83cf-99155cf1d8c3` |
+
+**统计口径说明：** 本地 OpenAI 兼容适配器将缓存命中部分从 `usage.input` 中扣除，另记为 `usage.cacheRead`。因此不能只比较 150 与 206 就判断哪一边上下文更多；本次应比较输入合计 4374 与 4174，差值为 200 token。输入还包含系统指令、工具定义等内容，所以新会话的输入不是只有这句话所占的 token。这里的 token 数据用于辅助观察，完整命令是否出现、有没有新工具调用及源码中的消息恢复路径构成主要证据。
 
 恢复会话的回答原文：
 
@@ -197,3 +242,26 @@ README 启动说明草稿（仅基于 handoff.txt 的信息）：
 ## 图表编辑
 
 `img/*.drawio` 为原生 XML 图元文件，文字、矩形、生命线和连接线均可分别编辑，没有嵌入整张 PNG。用 draw.io / diagrams.net 的“文件 → 打开”载入即可。图一与图二分别提供源文件；报告引用本人更新后的 `.drawio.png` 图片，图片中也内嵌了可编辑的 draw.io 数据。
+
+## 适合修改的位置
+
+| 想改变的行为 | 优先查看的位置 | 原因 |
+| --- | --- | --- |
+| 输入如何提交、回复如何显示 | `interactive-mode.ts` 的 `onSubmit`、`handleEvent()` | 分别连接用户输入和界面渲染。 |
+| 工具执行后是否继续请求模型 | `agent-loop.ts` 的 `runLoop()` | 工具结果在这里进入上下文，决定是否进入下一次模型请求。 |
+| read 如何读取和截断文件 | `core/tools/read.ts` | 文件路径处理、正文读取与输出截断集中在工具实现中。 |
+| 恢复哪些历史消息、新建会话清理哪些内容 | `session-manager.ts`、`agent-session-runtime.ts`、`sdk.ts` | 分别负责会话文件和历史投影、运行时替换，以及 Agent 初始消息的装配。 |
+
+## 实验体会
+
+这次实验让我把“一轮交互”和“一次模型调用”区分开了。用户只提交一次读取请求，模型先给出工具调用，read 的结果进入上下文后，模型再生成最终回答；工具结果参与了第二次请求，而不是直接成为最终回复。
+
+会话恢复也能沿源码解释：`-c` 找到已保存的会话，Pi 将历史消息重建到 Agent 的上下文，再加入新提问。完整随机命令已经保存在工具结果和旧回答里，所以恢复分支无需重新读文件。`/new` 创建新的聊天历史，即使还在同一目录，也不会自动拥有文件内容；本次模型因缺少命令而明确说明。
+
+另外，模型服务的缓存统计与聊天历史是两个不同层面。新会话仍可能命中相同系统提示的缓存，缓存命中不等于恢复了旧聊天。本次必须把未缓存输入与缓存读取相加，才能比较两次请求的输入规模。
+
+## 参考与证据说明
+
+- 报告的分节组织参考了[同学的实践课 5 报告](https://github.com/sakgratama-collab/pi-agent-practice/blob/main/practice5/practive-05.md)。模型、随机标识、回答、调用次数和 token 统计均使用本人记录。
+- [任务 A 原始消息节选](task-a-evidence.json)与[任务 B 原始消息节选](task-b-evidence.json)保留了工具参数、结果、最终回答和 usage 字段，可核对图示与结论。
+- 本报告的两张图片为 draw.io 绘制的源码分析图，不是终端截图；本次修订未新增截图。
