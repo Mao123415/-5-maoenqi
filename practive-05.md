@@ -9,7 +9,9 @@
 | 小组仓库 | [MangDui/pi-hunnu-2026](https://github.com/MangDui/pi-hunnu-2026) |
 | 环境 | Windows、PowerShell、本地构建 Pi v1.5.2 |
 | 模型 | deepseek / deepseek-flash，thinking off |
-| 日期 | 2026-11-26（截图对应 16:37—16:44 重新操作） |
+| 日期 | 2026-11-26 |
+
+截图为对应实验会话在 Pi 中恢复显示的界面。
 
 ## A. 单轮交互与工具调用
 
@@ -39,7 +41,7 @@ Pi 执行一次 read，读取 `D:/02-pi-agent-fork/pi-hunnu-2026/handoff.txt`。
 启动命令：npm run demo -- --profile group-a9b32a
 ```
 
-![A：读取 handoff.txt 并返回完整命令](img/screenshot-a-read.png)
+![A：读取 handoff.txt 并返回完整命令](img/screenshot-a-read-clean.png)
 
 本轮共 **1 次用户输入、2 次模型调用、1 次 read 执行**：
 
@@ -93,7 +95,7 @@ node .\packages\coding-agent\dist\cli.js --offline -c
 npm run demo -- --profile group-a9b32a
 ```
 
-![B-1：恢复会话，不调用工具即可给出完整命令](img/screenshot-b-continue.png)
+![B-1：恢复会话，不调用工具即可给出完整命令](img/screenshot-b-continue-clean.png)
 
 ### 2. 新建会话（/new）
 
@@ -105,7 +107,7 @@ npm run demo -- --profile group-a9b32a
 
 模型明确说明缺少完整启动命令，**未调用工具**。
 
-![B-2：新会话明确说明缺少命令](img/screenshot-b-new.png)
+![B-2：新会话明确说明缺少命令](img/screenshot-b-new-clean.png)
 
 ### 3. 对照记录
 
