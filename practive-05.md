@@ -9,7 +9,7 @@
 | 小组仓库 | [MangDui/pi-hunnu-2026](https://github.com/MangDui/pi-hunnu-2026) |
 | 环境 | Windows、PowerShell、本地构建 Pi v1.5.2 |
 | 模型 | deepseek / deepseek-flash，thinking off |
-| 日期 | 2026-11-26 |
+| 日期 | 2026-11-26（截图对应 16:37—16:44 重新操作） |
 
 ## A. 单轮交互与工具调用
 
@@ -25,23 +25,23 @@
 启动本地构建的 Pi：
 
 ```powershell
-node .\packages\coding-agent\dist\cli.js --offline --no-extensions --no-mcp --no-skills --no-prompt-templates --tools read --approve --name practice-05-A-retry
+node .\packages\coding-agent\dist\cli.js
 ```
 
 通过 `/model` 选择 `deepseek-flash`，输入以下问题，不透露启动命令：
 
 > 请用 read 工具读取当前目录的 handoff.txt，原样告诉我待办和启动命令。
 
-Pi 执行一次 read，读取 `D:/02-pi-agent-fork/pi-hunnu-2026/handoff.txt`。工具结果 `isError=false`，最终回答为：
+Pi 执行一次 read，读取 `D:/02-pi-agent-fork/pi-hunnu-2026/handoff.txt`。工具结果 `isError=false`，回答中包含完整的两行内容，并额外添加代码块和列表：
 
-```markdown
-handoff.txt 内容如下：
-
-- **待办**：补充 README 的启动说明
-- **启动命令**：`npm run demo -- --profile group-a9b32a`
+```text
+待办：补充 README 的启动说明
+启动命令：npm run demo -- --profile group-a9b32a
 ```
 
-待办和完整命令与文件一致，回答额外添加了列表与 Markdown 格式。本轮共 **1 次用户输入、2 次模型调用、1 次 read 执行**：
+![A：读取 handoff.txt 并返回完整命令](img/screenshot-a-read.png)
+
+本轮共 **1 次用户输入、2 次模型调用、1 次 read 执行**：
 
 ```text
 用户提问 → 模型返回 read 调用 → 工具返回文件内容
@@ -80,24 +80,20 @@ handoff.txt 内容如下：
 退出 Pi，在同一目录按原命令加 `-c` 启动：
 
 ```powershell
-node .\packages\coding-agent\dist\cli.js --offline --no-extensions --no-mcp --no-skills --no-prompt-templates --tools read --approve -c
+node .\packages\coding-agent\dist\cli.js --offline -c
 ```
 
 终端回放了 A 阶段的提问、read 记录和完整命令。输入：
 
 > 接着上次的待办，给 README 起草一条启动说明，写出交接单里的完整启动命令。只用这次会话已有的信息。不要调用工具。如果缺少命令，请直接说明。
 
-回答中给出的草稿为：
+回答给出了 README 启动说明，包含以下完整命令，**未调用工具**：
 
-```markdown
-## 启动
-
-运行演示：
-
-    npm run demo -- --profile group-a9b32a
+```bash
+npm run demo -- --profile group-a9b32a
 ```
 
-模型写出了 A 阶段的完整随机命令，**未调用工具**。
+![B-1：恢复会话，不调用工具即可给出完整命令](img/screenshot-b-continue.png)
 
 ### 2. 新建会话（/new）
 
@@ -105,9 +101,11 @@ node .\packages\coding-agent\dist\cli.js --offline --no-extensions --no-mcp --no
 
 回答开头为：
 
-> 这次会话里没有“上次的待办”或“交接单”的内容，也没有 README 文件被读取过，所以我无法起草一条包含完整启动命令的启动说明。
+> 本次会话没有上一轮的上下文：我还没读过 README，也没有见过交接单，因此没有任何可以引用的启动命令。
 
 模型明确说明缺少完整启动命令，**未调用工具**。
+
+![B-2：新会话明确说明缺少命令](img/screenshot-b-new.png)
 
 ### 3. 对照记录
 
@@ -118,9 +116,9 @@ node .\packages\coding-agent\dist\cli.js --offline --no-extensions --no-mcp --no
 | 本轮模型调用 | 1 次 | 1 次 |
 | 本轮工具调用 | 0 次 | 0 次 |
 | 回答含完整命令 | 是 | 否，说明缺少命令 |
-| 非缓存输入 token | 150 | 206 |
-| 缓存读取 token | 4224 | 3968 |
-| 输入合计 token | 4374 | 4174 |
+| 非缓存输入 token | 219 | 251 |
+| 缓存读取 token | 11776 | 11520 |
+| 输入合计 token | 11995 | 11771 |
 
 输入合计为 `usage.input + usage.cacheRead`；本次 `cacheWrite=0`。新会话仍带系统指令和工具定义，不能把非缓存输入数量直接当作全部上下文大小。
 
